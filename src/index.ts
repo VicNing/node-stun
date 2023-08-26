@@ -1,0 +1,1 @@
+export {bindingRequest} from './client'
