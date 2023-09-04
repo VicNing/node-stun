@@ -5,6 +5,7 @@ import { STUNClass, STUNMethod, STUNMessage } from "./types";
 
 export async function bindingRequest(
 
+
   address: string,
   port: number,
 ): Promise<STUNMessage> {
