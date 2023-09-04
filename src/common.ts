@@ -1,38 +1,47 @@
-import {randomBytes} from 'node:crypto';
-import {promisify} from 'node:util'
+import { randomBytes } from "node:crypto";
+import { promisify } from "node:util";
 import assert from "node:assert";
+import { crc } from "./crc32";
 
 import {
   AddressFamily,
   AttributeType,
-  BuildHeaderOption, MappedAddress, Software,
+  BuildHeaderOption,
+  Fingerprint,
+  MappedAddress,
+  Software,
   STUNAttribute,
   STUNClass,
   STUNHeader,
   STUNMessage,
   STUNMethod,
-  XORMappedAddress
+  XORMappedAddress,
 } from "./types";
 
-const MAGIC_COOKIE = 0x2112A442;
+const MAGIC_COOKIE = 0x2112a442;
 const HEADER_LENGTH = 20;
 
-export async function buildHeader(options: BuildHeaderOption): Promise<STUNHeader> {
+export async function buildHeader(
+  options: BuildHeaderOption,
+): Promise<STUNHeader> {
   const transactionID = await promisify(randomBytes)(12);
 
   return {
     method: options.method,
     class: options.class,
-    transactionID
+    transactionID,
   };
 }
 
-export function buildMessage(header: STUNHeader, attributes: STUNAttribute[]): STUNMessage {
+export function buildMessage(
+  header: STUNHeader,
+  attributes: STUNAttribute[],
+): STUNMessage {
   return {
     header: header,
     attributes: [],
-    length: 0//todo
-  }
+    length: 0, //todo
+  };
 }
 
 export function serialize(message: STUNMessage): Buffer {
@@ -41,25 +50,46 @@ export function serialize(message: STUNMessage): Buffer {
   buffer.writeUint16BE(message.header.method | message.header.class, 0);
   buffer.writeUint16BE(message.length, 2);
   buffer.writeUint32BE(MAGIC_COOKIE, 4);
-  buffer.fill(message.header.transactionID, 8, 8 + 12)
+  buffer.fill(message.header.transactionID, 8, 8 + 12);
 
   return buffer;
 }
 
-export function parseResponse(buffer: Buffer, requestMessage: STUNMessage): STUNMessage {
+export function parseResponse(
+  buffer: Buffer,
+  requestMessage: STUNMessage,
+): STUNMessage {
   // checks the first two bits are 0
-  assert.strictEqual((buffer[0] >> 6) & 0b11, 0, 'Invalid STUN message parsing response.');
+  assert.strictEqual(
+    (buffer[0] >> 6) & 0b11,
+    0,
+    "Invalid STUN message parsing response.",
+  );
 
   // checks magic cookie
-  assert.strictEqual(buffer.readUint32BE(4), MAGIC_COOKIE, 'Invalid STUN message parsing response.');
+  assert.strictEqual(
+    buffer.readUint32BE(4),
+    MAGIC_COOKIE,
+    "Invalid STUN message parsing response.",
+  );
 
   const stunClass = parseStunClass(buffer);
   const stunMethod = parseStunMethod(buffer);
 
   switch (requestMessage.header.method) {
-    case  STUNMethod.Binding: {
-      assert.strictEqual(true, [STUNClass.ErrorResponse, STUNClass.SuccessResponse].includes(stunClass), 'Invalid STUN class parsing response, expecting STUN class `success response` or `error response`.');
-      assert.strictEqual(stunMethod, STUNMethod.Binding, 'Invalid STUN method parsing response, expecting STUN method `Binding`.');
+    case STUNMethod.Binding: {
+      assert.strictEqual(
+        true,
+        [STUNClass.ErrorResponse, STUNClass.SuccessResponse].includes(
+          stunClass,
+        ),
+        "Invalid STUN class parsing response, expecting STUN class `success response` or `error response`.",
+      );
+      assert.strictEqual(
+        stunMethod,
+        STUNMethod.Binding,
+        "Invalid STUN method parsing response, expecting STUN method `Binding`.",
+      );
       break;
     }
   }
@@ -68,11 +98,19 @@ export function parseResponse(buffer: Buffer, requestMessage: STUNMessage): STUN
   const resTransactionID = buffer.subarray(8, 8 + 12);
   const reqTransactionID = requestMessage.header.transactionID;
   for (let i = 0; i < reqTransactionID.length; i++) {
-    assert.strictEqual(reqTransactionID[i], resTransactionID[i], 'Invalid STUN method parsing response, transaction ID not equal to the STUN request.');
+    assert.strictEqual(
+      reqTransactionID[i],
+      resTransactionID[i],
+      "Invalid STUN method parsing response, transaction ID not equal to the STUN request.",
+    );
   }
 
   const length = buffer.readUint16BE(2);
-  assert.strictEqual(length, buffer.length - 20, 'Invalid STUN message length field.');
+  assert.strictEqual(
+    length,
+    buffer.length - 20,
+    "Invalid STUN message length field.",
+  );
 
   let attributes: STUNAttribute[] = [];
 
@@ -84,10 +122,10 @@ export function parseResponse(buffer: Buffer, requestMessage: STUNMessage): STUN
     header: {
       class: stunClass,
       method: stunMethod,
-      transactionID: resTransactionID
+      transactionID: resTransactionID,
     },
     length,
-    attributes
+    attributes,
   };
 
   return message;
@@ -100,7 +138,7 @@ function parseStunClass(buffer: Buffer): STUNClass {
   if (Object.values(STUNClass).includes(firstTwoBytes)) {
     return firstTwoBytes;
   } else {
-    throw new Error('Invalid STUN class while parsing.');
+    throw new Error("Invalid STUN class while parsing.");
   }
 }
 
@@ -111,12 +149,15 @@ function parseStunMethod(buffer: Buffer): STUNMethod {
   if (Object.values(STUNMethod).includes(firstTwoBytes)) {
     return firstTwoBytes;
   } else {
-    throw new Error('Invalid STUN method while parsing.');
+    throw new Error("Invalid STUN method while parsing.");
   }
-
 }
 
-function parseAttributes(buffer: Buffer, offset: number, length: number): STUNAttribute[] {
+function parseAttributes(
+  buffer: Buffer,
+  offset: number,
+  length: number,
+): STUNAttribute[] {
   const attributes: STUNAttribute[] = [];
 
   // 20 represents header length
@@ -143,7 +184,11 @@ function parseAttribute(buffer: Buffer, offset: number): STUNAttribute {
 
   switch (type) {
     case AttributeType.XOR_MAPPED_ADDRESS: {
-      assert.strictEqual(buffer.readUint8(offset + 4), 0, 'Invalid XOR-MAPPED-ADDRESS attribute value, value should starts with 0x00.');
+      assert.strictEqual(
+        buffer.readUint8(offset + 4),
+        0,
+        "Invalid XOR-MAPPED-ADDRESS attribute value, value should starts with 0x00.",
+      );
 
       const family = buffer.readUint8(offset + 5);
       const xPort = buffer.readUint16BE(offset + 6);
@@ -154,12 +199,14 @@ function parseAttribute(buffer: Buffer, offset: number): STUNAttribute {
         xAddress = inetNtoP(buffer, offset + 8, AddressFamily.IPv4);
 
         const addressBuffer = Buffer.alloc(4);
-        addressBuffer.writeUint32BE(buffer.readUint32BE(offset + 8) ^ MAGIC_COOKIE);
+        addressBuffer.writeUint32BE(
+          buffer.readUint32BE(offset + 8) ^ MAGIC_COOKIE,
+        );
         address = inetNtoP(addressBuffer, 0, AddressFamily.IPv4);
       } else {
         //todo ipv6
-        xAddress = '';
-        address = '';
+        xAddress = "";
+        address = "";
       }
 
       const attribute: XORMappedAddress = {
@@ -169,12 +216,16 @@ function parseAttribute(buffer: Buffer, offset: number): STUNAttribute {
         xPort,
         port,
         xAddress,
-        address
-      }
+        address,
+      };
       return attribute;
     }
     case AttributeType.MAPPED_ADDRESS: {
-      assert.strictEqual(buffer.readUint8(offset + 4), 0, 'Invalid XOR-MAPPED-ADDRESS attribute value, value should starts with 0x00.');
+      assert.strictEqual(
+        buffer.readUint8(offset + 4),
+        0,
+        "Invalid XOR-MAPPED-ADDRESS attribute value, value should starts with 0x00.",
+      );
 
       const family = buffer.readUint8(offset + 5);
       const port = buffer.readUint16BE(offset + 6);
@@ -184,7 +235,7 @@ function parseAttribute(buffer: Buffer, offset: number): STUNAttribute {
         address = inetNtoP(buffer, offset + 8, AddressFamily.IPv4);
       } else {
         //todo ipv6
-        address = '';
+        address = "";
       }
 
       const attribute: MappedAddress = {
@@ -192,23 +243,41 @@ function parseAttribute(buffer: Buffer, offset: number): STUNAttribute {
         length,
         family,
         port,
-        address
-      }
+        address,
+      };
       return attribute;
     }
     case AttributeType.SOFTWARE: {
       const attribute: Software = {
         type,
         length,
-        description: buffer.toString('utf-8', offset + 4, offset + 4 + length),
+        description: buffer.toString("utf-8", offset + 4, offset + 4 + length),
+      };
+
+      return attribute;
+    }
+    case AttributeType.FINGERPRINT: {
+      const fingerprint = buffer.readUInt32BE(offset + 4);
+
+      const computedFingerprint = (crc(buffer, 0, offset) ^ 0x5354554e) >>> 0;
+
+      assert.strictEqual(
+        fingerprint,
+        computedFingerprint,
+        "Fingerprint attribute contains wrong CRC32 value.",
+      );
+
+      const attribute: Fingerprint = {
+        type,
+        length,
+        fingerprint,
       };
 
       return attribute;
     }
     default: {
-      return {type, length};
+      return { type, length };
     }
-
   }
 }
 
@@ -220,8 +289,9 @@ function inetNtoP(buffer: Buffer, offset: number, family: AddressFamily) {
       bytes.push(byte);
     }
 
-    return bytes.map(byte => byte.toString()).join('.');
+    return bytes.map((byte) => byte.toString()).join(".");
   } else {
-    return '';
+    //todo
+    return "";
   }
 }

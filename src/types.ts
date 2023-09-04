@@ -25,6 +25,10 @@ export interface Software extends STUNAttribute {
   description: string;
 }
 
+export interface Fingerprint extends STUNAttribute {
+  fingerprint: number
+}
+
 export enum AddressFamily {
   IPv4 = 0x01,
   IPv6 = 0x02
@@ -33,7 +37,8 @@ export enum AddressFamily {
 export enum AttributeType {
   MAPPED_ADDRESS = 0x0001,
   XOR_MAPPED_ADDRESS = 0x0020,
-  SOFTWARE = 0x8022
+  SOFTWARE = 0x8022,
+  FINGERPRINT = 0x8028
 }
 
 export interface STUNMessage {

@@ -2,7 +2,8 @@ const {bindingRequest} = require('../dist/index');
 
 async function test() {
   try {
-    const message = await bindingRequest('54.197.117.0', 3478);
+    // stun1.l.google.com:19302
+    const message = await bindingRequest('stun1.l.google.com', 19302);
     console.log(message);
   } catch (e) {
     console.error(e);
