@@ -21,6 +21,41 @@ import {
 const MAGIC_COOKIE = 0x2112a442;
 const HEADER_LENGTH = 20;
 
+export function parseStunURI(uri: string): { host: string; port: number } {
+  if (/^stuns?:*/.test(uri)) {
+    const regexResult = /^stuns?:(.*?)(:\d+)?$/.exec(uri);
+
+    if (regexResult?.[1]) {
+      const host = regexResult?.[1];
+      let port: number;
+
+      if (regexResult[2]) {
+        const portMatch = regexResult[2].slice(1);
+
+        if (portMatch) {
+          port = parseInt(portMatch);
+        } else {
+          throw new Error(
+            "STUN uri should be in the form of: 'stun:<address>[:port]'",
+          );
+        }
+      } else {
+        port = 3478;
+      }
+
+      return { host, port };
+    } else {
+      throw new Error(
+        "STUN uri should be in the form of: 'stun:<address>[:port]'",
+      );
+    }
+  } else {
+    throw new Error(
+      "STUN uri should be in the form of: 'stun:<address>[:port]', which port defaults to 3478",
+    );
+  }
+}
+
 export async function buildHeader(
   options: BuildHeaderOption,
 ): Promise<STUNHeader> {
@@ -199,8 +234,8 @@ function parseAttribute(buffer: Buffer, offset: number): STUNAttribute {
         xAddress = inetNtoP(buffer, offset + 8, AddressFamily.IPv4);
 
         const addressBuffer = Buffer.alloc(4);
-        addressBuffer.writeUint32BE(
-          buffer.readUint32BE(offset + 8) ^ MAGIC_COOKIE,
+        addressBuffer.writeInt32BE(
+          buffer.readInt32BE(offset + 8) ^ MAGIC_COOKIE,
         );
         address = inetNtoP(addressBuffer, 0, AddressFamily.IPv4);
       } else {

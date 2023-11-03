@@ -1,3 +1,11 @@
+export interface BindingRequestOptions {
+  port?: number;
+  socketType?: "tcp" | "udp";
+  socketFamily?: "ipv4" | "ipv6";
+  timeout?: number;
+  retryCount?: number;
+}
+
 export interface STUNHeader {
   class: STUNClass;
   method: STUNMethod;
@@ -26,19 +34,19 @@ export interface Software extends STUNAttribute {
 }
 
 export interface Fingerprint extends STUNAttribute {
-  fingerprint: number
+  fingerprint: number;
 }
 
 export enum AddressFamily {
   IPv4 = 0x01,
-  IPv6 = 0x02
+  IPv6 = 0x02,
 }
 
 export enum AttributeType {
   MAPPED_ADDRESS = 0x0001,
   XOR_MAPPED_ADDRESS = 0x0020,
   SOFTWARE = 0x8022,
-  FINGERPRINT = 0x8028
+  FINGERPRINT = 0x8028,
 }
 
 export interface STUNMessage {
@@ -56,11 +64,9 @@ export enum STUNClass {
   Request = 0b000000000,
   Indication = 0b000010000,
   SuccessResponse = 0b100000000,
-  ErrorResponse = 0b100010000
+  ErrorResponse = 0b100010000,
 }
 
 export enum STUNMethod {
   Binding = 0b000000000001,
 }
-
-

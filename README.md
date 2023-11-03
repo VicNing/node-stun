@@ -1,6 +1,6 @@
 # stunman
 
-`stunman` is a zero-dependency node.js library written in Typescript that implements Session Traversal Utilities for
+`stunman` is a zero-runtime-dependency node.js library written in Typescript that implements Session Traversal Utilities for
 NAT (STUN) protocol.
 
 ## Implemented Protocols
@@ -14,7 +14,7 @@ NAT (STUN) protocol.
 ## Usage
 
 ```typescript
-import {bindingRequest} from "stunman";
+import { bindingRequest } from "stunman/client";
 //or const { bindingRequest } = require('stunman');
 
 bindingRequest();
@@ -22,6 +22,8 @@ bindingRequest();
 
 ## Roadmap
 
-- [] TCP support
-- [] STUN server
-- 
+- [x] STUN URI parsing
+- [x] TCP support (TLS support should come with it)
+- [ ] DTLS support
+- [ ] IPv6 support
+- [ ] STUN server implementation
