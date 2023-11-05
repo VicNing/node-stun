@@ -3,6 +3,8 @@
 `stunman` is a zero-runtime-dependency node.js library written in Typescript that implements Session Traversal Utilities for
 NAT (STUN) protocol.
 
+**Currently under heavy constructon.**
+
 ## Implemented Protocols
 
 - [Session Traversal Utilities for NAT (STUN) (RFC 8489)](https://datatracker.ietf.org/doc/html/rfc8489)
@@ -24,6 +26,6 @@ bindingRequest();
 
 - [x] STUN URI parsing
 - [x] TCP support (TLS support should come with it)
+- [ ] STUN server implementation
 - [ ] DTLS support
 - [ ] IPv6 support
-- [ ] STUN server implementation
