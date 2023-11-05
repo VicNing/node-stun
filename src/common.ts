@@ -18,6 +18,8 @@ import {
   XORMappedAddress,
 } from "./types";
 
+import type { RemoteInfo } from "node:dgram";
+
 const MAGIC_COOKIE = 0x2112a442;
 const HEADER_LENGTH = 20;
 
@@ -59,7 +61,13 @@ export function parseStunURI(uri: string): { host: string; port: number } {
 export async function buildHeader(
   options: BuildHeaderOption,
 ): Promise<STUNHeader> {
-  const transactionID = await promisify(randomBytes)(12);
+  let transactionID: Buffer;
+
+  if (!options.transactionID) {
+    transactionID = await promisify(randomBytes)(12);
+  } else {
+    transactionID = options.transactionID;
+  }
 
   return {
     method: options.method,
@@ -68,13 +76,29 @@ export async function buildHeader(
   };
 }
 
+export function buildAttributes(rinfo: RemoteInfo): STUNAttribute[] {
+  const { xAddress, xPort } = xorAddress(rinfo);
+
+  const xorMappedAddress: XORMappedAddress = {
+    type: AttributeType.XOR_MAPPED_ADDRESS,
+    length: 8,
+    family: rinfo.family === "IPv4" ? AddressFamily.IPv4 : AddressFamily.IPv6,
+    port: rinfo.port,
+    address: rinfo.address,
+    xPort,
+    xAddress,
+  };
+
+  return [xorMappedAddress];
+}
+
 export function buildMessage(
   header: STUNHeader,
   attributes: STUNAttribute[],
 ): STUNMessage {
   return {
     header: header,
-    attributes: [],
+    attributes: attributes,
     length: 0, //todo
   };
 }
@@ -139,6 +163,66 @@ export function parseResponse(
       "Invalid STUN method parsing response, transaction ID not equal to the STUN request.",
     );
   }
+
+  const length = buffer.readUint16BE(2);
+  assert.strictEqual(
+    length,
+    buffer.length - 20,
+    "Invalid STUN message length field.",
+  );
+
+  let attributes: STUNAttribute[] = [];
+
+  if (length > 0) {
+    attributes = parseAttributes(buffer, 20, length);
+  }
+
+  const message: STUNMessage = {
+    header: {
+      class: stunClass,
+      method: stunMethod,
+      transactionID: resTransactionID,
+    },
+    length,
+    attributes,
+  };
+
+  return message;
+}
+
+export function parseRequest(buffer: Buffer): STUNMessage {
+  assert.strictEqual(
+    buffer[0] >> 6,
+    0,
+    "Invalid STUN message parsing response.",
+  );
+
+  // checks magic cookie
+  assert.strictEqual(
+    buffer.readUint32BE(4),
+    MAGIC_COOKIE,
+    "Invalid STUN message parsing response.",
+  );
+
+  const stunClass = parseStunClass(buffer);
+  const stunMethod = parseStunMethod(buffer);
+
+  console.log(stunClass);
+  console.log(stunMethod);
+
+  assert.strictEqual(
+    stunClass,
+    STUNClass.Request,
+    "Expecting a STUN request message.",
+  );
+
+  assert.strictEqual(
+    stunMethod,
+    STUNMethod.Binding,
+    "Expecting a STUN binding request.",
+  );
+
+  const resTransactionID = buffer.subarray(8, 8 + 12);
 
   const length = buffer.readUint16BE(2);
   assert.strictEqual(
@@ -328,5 +412,55 @@ function inetNtoP(buffer: Buffer, offset: number, family: AddressFamily) {
   } else {
     //todo
     return "";
+  }
+}
+
+function inetPtoN(address: string, family: AddressFamily): Buffer {
+  if (family === AddressFamily.IPv4) {
+    const buffer = Buffer.alloc(4);
+
+    const byteStrs = address.split(".");
+
+    if (byteStrs.length !== 4) {
+      throw new Error("invalid IPv4 address.");
+    }
+
+    for (let i = 0; i < byteStrs.length; i++) {
+      buffer.writeUint8(parseInt(byteStrs[i], 10), i);
+    }
+
+    return buffer;
+  } else {
+    throw new Error("IPv6 inetPtoN not implemented yet!");
+  }
+}
+
+function xorAddress(rinfo: RemoteInfo): { xAddress: string; xPort: number } {
+  if (rinfo.family === "IPv4") {
+    const octets = rinfo.address.split(".");
+
+    const int32 =
+      (parseInt(octets[0], 10) << 24) |
+      (parseInt(octets[1], 10) << 16) |
+      (parseInt(octets[2], 10) << 8) |
+      parseInt(octets[3], 10);
+
+    const xored = int32 ^ MAGIC_COOKIE;
+
+    const xAddress =
+      ((xored >>> 24) & 0xff) +
+      "." +
+      ((xored >>> 16) & 0xff) +
+      "." +
+      ((xored >>> 8) & 0xff) +
+      "." +
+      (xored & 0xff);
+
+    return {
+      xAddress,
+      xPort: rinfo.port ^ (MAGIC_COOKIE >>> 16),
+    };
+  } else {
+    throw new Error("IPv6 address not implemented yet!");
   }
 }

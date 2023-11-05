@@ -58,6 +58,7 @@ export interface STUNMessage {
 export interface BuildHeaderOption {
   class: STUNClass;
   method: STUNMethod;
+  transactionID?: Buffer;
 }
 
 export enum STUNClass {
