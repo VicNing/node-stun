@@ -19,6 +19,7 @@ import {
 } from "./types";
 
 import type { RemoteInfo } from "node:dgram";
+import { off } from "node:process";
 
 const MAGIC_COOKIE = 0x2112a442;
 const HEADER_LENGTH = 20;
@@ -104,12 +105,45 @@ export function buildMessage(
 }
 
 export function serialize(message: STUNMessage): Buffer {
-  const buffer = Buffer.alloc(message.length + HEADER_LENGTH);
+  const bufferSize = calculateBufferSize(message);
+  message.length = bufferSize - HEADER_LENGTH;
+
+  const buffer = Buffer.alloc(bufferSize);
 
   buffer.writeUint16BE(message.header.method | message.header.class, 0);
   buffer.writeUint16BE(message.length, 2);
   buffer.writeUint32BE(MAGIC_COOKIE, 4);
   buffer.fill(message.header.transactionID, 8, 8 + 12);
+
+  let offset = 20;
+  for (let attribute of message.attributes) {
+    buffer.writeUint16BE(attribute.type, offset);
+    offset += 2;
+    buffer.writeUint16BE(attribute.length, offset);
+    offset += 2;
+
+    switch (attribute.type) {
+      case AttributeType.XOR_MAPPED_ADDRESS: {
+        offset += 1;
+
+        buffer.writeUint8((attribute as XORMappedAddress).family, offset);
+        offset += 1;
+
+        buffer.writeUint16BE((attribute as XORMappedAddress).xPort, offset);
+        offset += 2;
+
+        buffer.fill(
+          inetPtoN(
+            (attribute as XORMappedAddress).xAddress,
+            (attribute as XORMappedAddress).family,
+          ),
+          offset,
+        );
+        offset += 4;
+        break;
+      }
+    }
+  }
 
   return buffer;
 }
@@ -463,4 +497,20 @@ function xorAddress(rinfo: RemoteInfo): { xAddress: string; xPort: number } {
   } else {
     throw new Error("IPv6 address not implemented yet!");
   }
+}
+
+function calculateBufferSize(message: STUNMessage): number {
+  let length = HEADER_LENGTH;
+
+  for (const attribute of message.attributes) {
+    let attributeLength = 4 /*type + length fileds*/ + attribute.length;
+
+    if (attributeLength % 4 !== 0) {
+      attributeLength += 4 - (attributeLength % 4); //padding
+    }
+
+    length += attributeLength;
+  }
+
+  return length;
 }

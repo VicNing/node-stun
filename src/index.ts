@@ -1,1 +1,2 @@
-export {bindingRequest} from './client'
+export { bindingRequest } from "./client";
+export { bind } from "./server";

@@ -4,9 +4,9 @@ import {
   buildHeader,
   buildMessage,
   parseRequest,
+  serialize,
 } from "./common";
 import { STUNClass, STUNMethod } from "./types";
-import { serialize } from "node:v8";
 
 export function bind(port: number = 3478) {
   const server = createSocket("udp4");
@@ -32,6 +32,8 @@ export function bind(port: number = 3478) {
       const responseMsg = buildMessage(responseHeader, responseAttributes);
 
       const buffer = serialize(responseMsg);
+
+      server.send(buffer, rinfo.port, rinfo.address);
     } catch (e) {
       // ErrorResponse
     }
