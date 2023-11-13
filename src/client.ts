@@ -1,4 +1,4 @@
-import { createSocket } from "node:dgram";
+import { Socket, createSocket } from "node:dgram";
 import {
   buildHeader,
   buildMessage,
@@ -12,6 +12,7 @@ import {
   STUNMethod,
   STUNMessage,
   BindingRequestOptions,
+  UDPTransmitOptions,
 } from "./types";
 
 import { createConnection } from "node:net";
@@ -32,6 +33,10 @@ function udpBindingRequest(
   options?: BindingRequestOptions,
 ): Promise<STUNMessage> {
   return new Promise<STUNMessage>(async (resolve, reject) => {
+    const maxRetransmissionCount = options?.maxRetransmissionCount ?? 7;
+    const maxRetransmissionRTOFactor =
+      options?.maxRetransmissionRTOFactor ?? 16;
+
     const { host, port } = parseStunURI(uri);
 
     const header = await buildHeader({
@@ -44,6 +49,8 @@ function udpBindingRequest(
     const buffer = serialize(message);
 
     const socket = createSocket({ type: "udp4", reuseAddr: true }, (msg) => {
+      clearTimeout(transmitOptions.timer);
+
       try {
         resolve(parseResponse(msg, message));
       } catch (e) {
@@ -59,16 +66,41 @@ function udpBindingRequest(
 
     socket.on("error", (err) => {
       if (err) {
+        clearTimeout(transmitOptions.timer);
         reject(err);
       }
     });
 
-    socket.send(buffer, port, host, (err) => {
-      if (err) {
-        reject(err);
-      }
-    });
+    const transmitOptions: UDPTransmitOptions = {
+      socket,
+      buffer,
+      port,
+      host,
+      rto: 500,
+      timer: undefined,
+      retransmissionCount: 0,
+      maxRetransmissionCount,
+      maxRetransmissionRTOFactor,
+    };
+
+    transmit(transmitOptions);
   });
+}
+
+function transmit(udpTransmitOptions: UDPTransmitOptions) {
+  const { socket, buffer, port, host, rto } = udpTransmitOptions;
+
+  socket.send(buffer, port, host);
+
+  const timer = setTimeout(() => {
+    transmit({
+      ...udpTransmitOptions,
+      rto: udpTransmitOptions.rto * 2,
+      retransmissionCount: udpTransmitOptions.retransmissionCount + 1,
+    });
+  }, rto);
+
+  udpTransmitOptions.timer = timer;
 }
 
 function tcpBindingRequest(

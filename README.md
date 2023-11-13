@@ -25,7 +25,8 @@ bindingRequest();
 ## Roadmap
 
 - [x] STUN URI parsing
-- [x] TCP support (TLS support should come with it)
+- [x] Basic TCP support
+- [ ] UDP retransmission
 - [ ] STUN server implementation
 - [ ] DTLS support
 - [ ] IPv6 support

@@ -1,9 +1,11 @@
+import { Socket } from "node:dgram";
+
 export interface BindingRequestOptions {
   port?: number;
   socketType?: "tcp" | "udp";
   socketFamily?: "ipv4" | "ipv6";
-  timeout?: number;
-  retryCount?: number;
+  maxRetransmissionCount?: number;
+  maxRetransmissionRTOFactor?: number;
 }
 
 export interface STUNHeader {
@@ -70,4 +72,16 @@ export enum STUNClass {
 
 export enum STUNMethod {
   Binding = 0b000000000001,
+}
+
+export interface UDPTransmitOptions {
+  socket: Socket;
+  buffer: Buffer;
+  port: number;
+  host: string;
+  rto: number;
+  maxRetransmissionRTOFactor: number;
+  retransmissionCount: number;
+  maxRetransmissionCount: number;
+  timer?: NodeJS.Timeout;
 }

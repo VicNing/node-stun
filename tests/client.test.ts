@@ -9,8 +9,9 @@ import {
 
 describe("STUN binding request", () => {
   test.only("basic binding request should success", async () => {
-    // const response = await bindingRequest("stun:stun1.l.google.com:19302");
-    const response = await bindingRequest("stun:localhost:3478");
+    const response = await bindingRequest("stun:stun1.l.google.com:19302");
+    // const response = await bindingRequest("stun:localhost:3478");
+    console.log(response);
 
     expect(response.header.method).toBe(STUNMethod.Binding);
     expect(response.header.class).toBe(STUNClass.SuccessResponse);
