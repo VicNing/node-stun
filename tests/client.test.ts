@@ -8,10 +8,9 @@ import {
 } from "../src/types";
 
 describe("STUN binding request", () => {
-  test.only("basic binding request should success", async () => {
+  test("basic binding request should success", async () => {
     const response = await bindingRequest("stun:stun1.l.google.com:19302");
     // const response = await bindingRequest("stun:localhost:3478");
-    console.log(response);
 
     expect(response.header.method).toBe(STUNMethod.Binding);
     expect(response.header.class).toBe(STUNClass.SuccessResponse);
@@ -52,18 +51,22 @@ describe("STUN binding request", () => {
   });
 });
 
+describe("retransmission", () => {
+  test("");
+});
+
 describe("STUN URI", () => {
   test("parsing 'stun:<host>[:port]' scheme uri with host and port", () => {
-    const { host, port } = parseStunURI("stun:foo:1234");
+    const { address, port } = parseStunURI("stun:foo:1234");
 
-    expect(host).toBe("foo");
+    expect(address).toBe("foo");
     expect(port).toBe(1234);
   });
 
   test("parsing 'stun:<host>' should yield default port 3478", () => {
-    const { host, port } = parseStunURI("stun:foo");
+    const { address, port } = parseStunURI("stun:foo");
 
-    expect(host).toBe("foo");
+    expect(address).toBe("foo");
     expect(port).toBe(3478);
   });
 

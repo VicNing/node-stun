@@ -24,12 +24,12 @@ import { off } from "node:process";
 const MAGIC_COOKIE = 0x2112a442;
 const HEADER_LENGTH = 20;
 
-export function parseStunURI(uri: string): { host: string; port: number } {
+export function parseStunURI(uri: string): { address: string; port: number } {
   if (/^stuns?:*/.test(uri)) {
     const regexResult = /^stuns?:(.*?)(:\d+)?$/.exec(uri);
 
     if (regexResult?.[1]) {
-      const host = regexResult?.[1];
+      const address = regexResult?.[1];
       let port: number;
 
       if (regexResult[2]) {
@@ -46,7 +46,7 @@ export function parseStunURI(uri: string): { host: string; port: number } {
         port = 3478;
       }
 
-      return { host, port };
+      return { address, port };
     } else {
       throw new Error(
         "STUN uri should be in the form of: 'stun:<address>[:port]'",

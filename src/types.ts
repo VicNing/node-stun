@@ -4,8 +4,8 @@ export interface BindingRequestOptions {
   port?: number;
   socketType?: "tcp" | "udp";
   socketFamily?: "ipv4" | "ipv6";
-  maxRetransmissionCount?: number;
-  maxRetransmissionRTOFactor?: number;
+  maxRetransmitCount?: number;
+  maxRetransmitRTOFactor?: number;
 }
 
 export interface STUNHeader {

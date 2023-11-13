@@ -1,4 +1,4 @@
-import { Socket, createSocket } from "node:dgram";
+import { createSocket } from "node:dgram";
 import {
   buildHeader,
   buildMessage,
@@ -16,6 +16,7 @@ import {
 } from "./types";
 
 import { createConnection } from "node:net";
+import { UDPRequester } from "./udp_requester";
 
 export async function bindingRequest(
   uri: string,
@@ -33,11 +34,7 @@ function udpBindingRequest(
   options?: BindingRequestOptions,
 ): Promise<STUNMessage> {
   return new Promise<STUNMessage>(async (resolve, reject) => {
-    const maxRetransmissionCount = options?.maxRetransmissionCount ?? 7;
-    const maxRetransmissionRTOFactor =
-      options?.maxRetransmissionRTOFactor ?? 16;
-
-    const { host, port } = parseStunURI(uri);
+    const { address, port } = parseStunURI(uri);
 
     const header = await buildHeader({
       method: STUNMethod.Binding,
@@ -48,59 +45,19 @@ function udpBindingRequest(
 
     const buffer = serialize(message);
 
-    const socket = createSocket({ type: "udp4", reuseAddr: true }, (msg) => {
-      clearTimeout(transmitOptions.timer);
-
-      try {
-        resolve(parseResponse(msg, message));
-      } catch (e) {
-        reject(e);
-      }
-
-      socket.close();
+    const requester = new UDPRequester({
+      maxRetransmitCount: options?.maxRetransmitCount,
+      maxRetransmitRTOFactor: options?.maxRetransmitRTOFactor,
+      localPort: options?.port,
     });
 
-    if (typeof options?.port === "number") {
-      socket.bind(options.port);
+    try {
+      const response = await requester.request(buffer, address, port);
+      resolve(parseResponse(response, message));
+    } catch (e) {
+      reject(e);
     }
-
-    socket.on("error", (err) => {
-      if (err) {
-        clearTimeout(transmitOptions.timer);
-        reject(err);
-      }
-    });
-
-    const transmitOptions: UDPTransmitOptions = {
-      socket,
-      buffer,
-      port,
-      host,
-      rto: 500,
-      timer: undefined,
-      retransmissionCount: 0,
-      maxRetransmissionCount,
-      maxRetransmissionRTOFactor,
-    };
-
-    transmit(transmitOptions);
   });
-}
-
-function transmit(udpTransmitOptions: UDPTransmitOptions) {
-  const { socket, buffer, port, host, rto } = udpTransmitOptions;
-
-  socket.send(buffer, port, host);
-
-  const timer = setTimeout(() => {
-    transmit({
-      ...udpTransmitOptions,
-      rto: udpTransmitOptions.rto * 2,
-      retransmissionCount: udpTransmitOptions.retransmissionCount + 1,
-    });
-  }, rto);
-
-  udpTransmitOptions.timer = timer;
 }
 
 function tcpBindingRequest(
@@ -108,7 +65,7 @@ function tcpBindingRequest(
   options?: BindingRequestOptions,
 ): Promise<STUNMessage> {
   return new Promise<STUNMessage>(async (resolve, reject) => {
-    const { host, port } = parseStunURI(uri);
+    const { address, port } = parseStunURI(uri);
 
     const header = await buildHeader({
       method: STUNMethod.Binding,
@@ -120,7 +77,7 @@ function tcpBindingRequest(
     const buffer = serialize(message);
 
     const socket = createConnection(
-      { port, host, localPort: options?.port },
+      { port, host: address, localPort: options?.port },
       () => {
         socket.write(buffer);
       },
